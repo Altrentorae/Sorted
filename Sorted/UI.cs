@@ -62,10 +62,10 @@ namespace Sorted {
         }
         
         private void InterfaceControlsEnabled(bool Enabled) {
-            
+
+            checkbox_newThread.Enabled = Enabled;
             button_GenerateNew.Enabled = Enabled;
             button_Sort.Enabled = Enabled;
-            trackBar1.Enabled = Enabled;
             trackBar2.Enabled = Enabled;
             textBox_seedInput.Enabled = Enabled;
             comboBox_SortMethod.Enabled = Enabled;
@@ -76,49 +76,73 @@ namespace Sorted {
             Sort();
         }
 
-        private void Sort() {
+        private async void Sort() {
             InterfaceControlsEnabled(false);
 
             //First switch is just to get passes under automatic pass count
-            if (checkBox_AutoPasses.Checked) {
-                switch (SM) {
-                    case SortMethod.BubbleSort: passes = Unsorted.Length; break;
-                    case SortMethod.InsertSort:
-                    case SortMethod.BogoSort:
-                    case SortMethod.CountingSort: passes = 1; break;
-                }
-                trackBar1.Value = passes;
+            
+            switch (SM) {
+                case SortMethod.BubbleSort: passes = Unsorted.Length; break;
+                case SortMethod.InsertSort:
+                case SortMethod.BogoSort:
+                case SortMethod.CountingSort: passes = 1; break;
             }
+            
             DateTime dt = DateTime.Now;
 
-            for (int i = 0; i < passes; i++) {
-                switch (SM) {
-                    case SortMethod.BubbleSort:
-
-                    Unsorted = BubbleSort(Unsorted);
-                    BindToUI(Unsorted); break; //Bind to UI is only supported for predictable sorts, all others are handled in-method
-                    case SortMethod.InsertSort:
-                    Unsorted = InsertSort(Unsorted, chart1);
-                    //BindToUI(Unsorted); 
-                    break;
-                    case SortMethod.BogoSort:
-                    if (checkBox_AutoPasses.Checked) {
-                        while (!IsSorted(Unsorted)) {
-                            Unsorted = BogoSort(Unsorted);
+            if (!checkbox_newThread.Checked) {
+                for (int i = 0; i < passes; i++) {
+                    switch (SM) {
+                        case SortMethod.BubbleSort:
+                            Unsorted = BubbleSort(Unsorted);
                             BindToUI(Unsorted);
-                            chart1.Update();
-                        }
+                            break; //Bind to UI is only supported for predictable sorts, all others are handled in-method
+                        case SortMethod.InsertSort:
+                            Unsorted = InsertSort(Unsorted, chart1);
+                            //BindToUI(Unsorted); 
+                            break;
+                        case SortMethod.BogoSort:
+                            while (!IsSorted(Unsorted)) {
+                                Unsorted = BogoSort(Unsorted);
+                                BindToUI(Unsorted);
+                                chart1.Update();
+                            }
+                            break;
+                        case SortMethod.CountingSort:
+                            Unsorted = CountingSort(Unsorted);
+                            break;
                     }
-                    else {
-                        if (!IsSorted(Unsorted)) {
-                            Unsorted = BogoSort(Unsorted);
-                        }
-                    }
-                    break;
-                    case SortMethod.CountingSort:
-                    CountingSort(Unsorted);
-                    break;
                 }
+            }
+            else {
+                for (int i = 0; i < passes; i++) {
+                    switch (SM) {
+                        case SortMethod.BubbleSort:
+                            await Task.Run( () =>
+                            Unsorted = BubbleSort(Unsorted));
+                            //BindToUI(Unsorted);
+                            break; //Bind to UI is only supported for predictable sorts, all others are handled in-method
+                        case SortMethod.InsertSort:
+                            await Task.Run( () =>
+                            Unsorted = InsertSort(Unsorted, chart1));
+                            //BindToUI(Unsorted); 
+                            break;
+                        case SortMethod.BogoSort:
+                            while (!IsSorted(Unsorted)) {
+                                await Task.Run( () =>
+                                Unsorted = BogoSort(Unsorted));
+                                //BindToUI(Unsorted);
+                                //chart1.Update();
+                            }
+                            break;
+                        case SortMethod.CountingSort:
+                            await Task.Run( () =>
+                            Unsorted = CountingSort(Unsorted));
+                            break;
+                    }
+                }
+                BindToUI(Unsorted);
+                
             }
 
             label_time.Text = (DateTime.Now - dt).ToString();
@@ -135,14 +159,12 @@ namespace Sorted {
 
         int passes = 0;
         private void trackBar1_Scroll(object sender, EventArgs e) {
-            passes = trackBar1.Value;
-            label_passes.Text = trackBar1.Value.ToString();
+            
         }
 
         
         private void checkBox_AutoPasses_CheckedChanged(object sender, EventArgs e) {
-            trackBar1.Enabled = !checkBox_AutoPasses.Checked;
-            label_passes.Text = checkBox_AutoPasses.Checked ? "AUTO" : trackBar1.Value.ToString();
+            
         }
 
         SortMethod SM;
@@ -226,10 +248,13 @@ namespace Sorted {
             int c = source.Min();
             while(@new.Count!=source.Length) {
                 if (vps.ContainsKey(c)) {
-                    for(int j = 0; j < vps[c]; j++) {
+                    for (int j = 0; j < vps[c]; j++) {
                         @new.Add(c);
-                        BindToUI(@new.ToArray());
-                        chart1.Update();
+
+                        if (!checkbox_newThread.Checked) {
+                            BindToUI(@new.ToArray());
+                            chart1.Update();
+                        }
                     }
                     
                 }
